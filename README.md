@@ -22,6 +22,17 @@ npm run dev      # same, with a faster simulated inventory feed (every 5s)
 
 Imports apply instantly if the server is running. Only visible products are imported; descriptions are converted to plain text. Products without inventory tracking are shown as in stock. `npm run import -- --demo` switches back to the demo catalog (restart afterwards).
 
+## Deploy to Vercel
+
+The repo is ready for Vercel (`vercel.json` + `api/index.js`): the storefront is served from `public/` and the API runs as a serverless function.
+
+1. Import the GitHub repo in Vercel — no build settings needed.
+2. **Add a database so orders, reviews and subscribers are saved:** Vercel dashboard → your project → **Storage** → **Create / Connect** → **Upstash for Redis** (free tier) → connect it to the project. This adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` automatically. Redeploy.
+   Without it the site works, but anything customers submit is lost after a few minutes.
+3. The product catalog ships with the code from `seed/products.json`. To update it: run an import locally, then `npm run seed` and push.
+
+On Vercel, prices/stock refresh every 60 s and open browsers reload automatically after each deploy (no live stream on serverless).
+
 ## Features
 
 - **Vehicle part finder** — Year → Make → Model → Part, remembered between visits.

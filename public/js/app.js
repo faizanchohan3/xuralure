@@ -984,7 +984,11 @@
     if (!('EventSource' in window)) return pollVersion();
     const es = new EventSource('/api/stream');
     es.addEventListener('open', () => pill.classList.add('on'));
-    es.addEventListener('error', () => pill.classList.remove('on')); // EventSource auto-reconnects
+    es.addEventListener('error', () => {
+      pill.classList.remove('on'); // EventSource auto-reconnects on network errors…
+      // …but a closed stream (serverless hosts like Vercel) means: poll instead
+      if (es.readyState === EventSource.CLOSED) { es.close(); pollVersion(); }
+    });
     es.addEventListener('version', (e) => onNewVersion(JSON.parse(e.data).version));
     es.addEventListener('inventory', (e) => applyInventory(JSON.parse(e.data)));
     es.addEventListener('catalog', reloadCatalog);
@@ -1010,19 +1014,26 @@
       toast(`Catalog updated — ${products.length.toLocaleString()} parts available.`);
     } catch { /* will catch up on next visibility change */ }
   }
+  // Polling mode: check for a new deploy every 30s and refresh prices/stock every 60s
+  let polling = false;
   function pollVersion() {
+    if (polling) return;
+    polling = true;
+    $('#livePill').classList.add('on');
+    api('/api/version').then((v) => onNewVersion(v.version)).catch(() => {});
     setInterval(async () => { try { onNewVersion((await api('/api/version')).version); } catch { /* offline */ } }, 30000);
+    setInterval(() => { if (document.visibilityState === 'visible') resync(); }, 60000);
   }
 
   // Full resync when the tab becomes visible again (catches anything missed while asleep)
-  document.addEventListener('visibilitychange', async () => {
-    if (document.visibilityState !== 'visible') return;
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') resync(); });
+  async function resync() {
     try {
       const fresh = await api('/api/products');
       if (fresh.length !== state.products.length || fresh.some((p) => !state.byId.has(p.id))) return reloadCatalog();
       applyInventory(fresh.filter((p) => { const o = state.byId.get(p.id); return o && (o.price !== p.price || o.stock !== p.stock); }));
     } catch { /* offline */ }
-  });
+  }
 
   // ---------- boot ----------
   $('#year').textContent = new Date().getFullYear();

@@ -9,15 +9,22 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const { VEHICLES, CATEGORIES, buildProducts } = require('./catalog');
 const { importApi } = require('./lib/bigcommerce');
+const kv = require('./lib/kv');
 
 const PORT = Number(process.env.PORT) || 4321;
 const PUBLIC = path.join(__dirname, 'public');
-const DATA = path.join(__dirname, 'data');
+// Serverless hosts (Vercel) have a read-only filesystem except /tmp
+const SERVERLESS = Boolean(process.env.VERCEL);
+const DATA = SERVERLESS ? '/tmp/xoralure-data' : path.join(__dirname, 'data');
 const DEV = process.argv.includes('--dev');
 
 fs.mkdirSync(DATA, { recursive: true });
 
 // ---------- persistence ----------
+// Local files always; on serverless, also the KV database (see lib/kv.js),
+// because /tmp is wiped between cold starts and not shared between instances.
+const KV_COLLECTIONS = ['orders.json', 'quotes.json', 'messages.json', 'subscribers.json', 'reviews.json', 'stock.json'];
+const pendingWrites = [];
 function load(name, fallback) {
   try { return JSON.parse(fs.readFileSync(path.join(DATA, name), 'utf8')); }
   catch { return typeof fallback === 'function' ? fallback() : fallback; }
@@ -26,12 +33,33 @@ function save(name, value) {
   const file = path.join(DATA, name);
   fs.writeFileSync(file + '.tmp', JSON.stringify(value, null, 2));
   fs.renameSync(file + '.tmp', file);
+  if (kv.enabled) {
+    // The full catalog is too big for KV; only stock levels change at runtime
+    if (name === 'products.json') pendingWrites.push(kv.set('stock.json', stockMap()));
+    else if (KV_COLLECTIONS.includes(name)) pendingWrites.push(kv.set(name, value));
+  }
 }
+async function flushWrites() {
+  if (pendingWrites.length) await Promise.all(pendingWrites.splice(0));
+}
+const stockMap = () => Object.fromEntries(products.filter((p) => p.stock != null).map((p) => [p.id, p.stock]));
+
+// Bundled product list (seed/), committed with the code so serverless deploys
+// have the real catalog. Falls back to the generated demo catalog.
+// (static require paths so Vercel's bundler includes the files)
+const SEED = {
+  'products.json': () => require('./seed/products.json'),
+  'categories.json': () => require('./seed/categories.json')
+};
+function seed(name) {
+  try { return SEED[name](); } catch { return null; }
+}
+const seedProducts = seed('products.json');
 
 // source.json exists once real inventory has been imported (see import.js)
-let source = load('source.json', null);
-let products = load('products.json', buildProducts);
-let categories = load('categories.json', CATEGORIES);
+let source = load('source.json', seedProducts ? { type: 'seed' } : null);
+let products = load('products.json', () => seedProducts || buildProducts());
+let categories = load('categories.json', () => seed('categories.json') || CATEGORIES);
 let orders = load('orders.json', []);
 let quotes = load('quotes.json', []);
 let messages = load('messages.json', []);
@@ -43,7 +71,7 @@ function reviewStats(list) {
   const count = list.length;
   return { count, average: count ? +(list.reduce((s, r) => s + r.rating, 0) / count).toFixed(1) : 0 };
 }
-save('products.json', products);
+if (!SERVERLESS) save('products.json', products);
 
 // null stock = inventory not tracked in the store, treated as available
 const available = (p) => (p.stock == null ? 10 : p.stock);
@@ -60,10 +88,25 @@ function hashDir(dir) {
   })(dir);
   return h.digest('hex').slice(0, 10);
 }
-let siteVersion = hashDir(PUBLIC);
+// On Vercel every deploy gets a new id, so open browsers reload after a deploy
+let siteVersion = SERVERLESS
+  ? String(process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || 'vercel').slice(-10)
+  : hashDir(PUBLIC);
+
+// Serverless: pull shared data from KV (at most every few seconds per instance)
+let hydratedAt = 0;
+async function hydrate() {
+  if (!kv.enabled || Date.now() - hydratedAt < 3000) return;
+  const d = await kv.getMany(KV_COLLECTIONS);
+  orders = d['orders.json'] || []; quotes = d['quotes.json'] || []; messages = d['messages.json'] || [];
+  subscribers = d['subscribers.json'] || []; reviews = d['reviews.json'] || [];
+  const stock = d['stock.json'] || {};
+  for (const p of products) if (p.id in stock) p.stock = stock[p.id];
+  hydratedAt = Date.now();
+}
 
 let watchTimer;
-try {
+if (!SERVERLESS) try {
   fs.watch(PUBLIC, { recursive: true }, () => {
     clearTimeout(watchTimer);
     watchTimer = setTimeout(() => {
@@ -85,7 +128,7 @@ function broadcast(event, data) {
   const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of clients) res.write(msg);
 }
-setInterval(() => broadcast('ping', { t: Date.now() }), 25000);
+if (!SERVERLESS) setInterval(() => broadcast('ping', { t: Date.now() }), 25000);
 
 // Apply a freshly imported catalog: push price/stock changes in place, and tell
 // browsers to reload the catalog if products were added or removed.
@@ -119,12 +162,14 @@ function applyPendingImport() {
     console.log(`[import] loaded ${products.length} products (${r.structural ? 'catalog changed' : r.changed + ' price/stock change(s)'})`);
   } catch (e) { console.error('[import] could not apply import.json:', e.message); }
 }
-applyPendingImport();
-fs.watchFile(IMPORT_FILE, { interval: 2000 }, (cur) => { if (cur.mtimeMs) applyPendingImport(); });
+if (!SERVERLESS) {
+  applyPendingImport();
+  fs.watchFile(IMPORT_FILE, { interval: 2000 }, (cur) => { if (cur.mtimeMs) applyPendingImport(); });
+}
 
 // Live sync with BigCommerce when API credentials are configured
 const BC_HASH = process.env.BC_STORE_HASH, BC_TOKEN = process.env.BC_ACCESS_TOKEN;
-if (BC_HASH && BC_TOKEN) {
+if (BC_HASH && BC_TOKEN && !SERVERLESS) {
   const minutes = Math.max(1, Number(process.env.BC_SYNC_MINUTES) || 15);
   const sync = async () => {
     try {
@@ -143,7 +188,7 @@ if (BC_HASH && BC_TOKEN) {
 
 // Simulated warehouse feed for the demo catalog only — real inventory is never
 // altered. Stock and prices move over time to show live updates working.
-setInterval(() => {
+if (!SERVERLESS) setInterval(() => {
   if (source) return;
   const changed = [];
   for (let i = 0; i < 3; i++) {
@@ -180,7 +225,8 @@ const MIME = {
   '.webmanifest': 'application/manifest+json', '.txt': 'text/plain'
 };
 
-function send(res, status, body, headers = {}) {
+async function send(res, status, body, headers = {}) {
+  await flushWrites();
   const data = typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body);
   res.writeHead(status, {
     'Content-Type': typeof body === 'object' && !Buffer.isBuffer(body) ? 'application/json' : 'text/plain',
@@ -229,6 +275,7 @@ async function api(req, res, url) {
   }
 
   if (route === 'GET /api/stream') {
+    if (SERVERLESS) return send(res, 204, '');
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
     res.write(`event: version\ndata: ${JSON.stringify({ version: siteVersion })}\n\n`);
     clients.add(res);
@@ -389,16 +436,24 @@ function serveStatic(req, res, url) {
   });
 }
 
-http.createServer(async (req, res) => {
+async function handler(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  // Vercel rewrite: /api/<path> -> /api/index?path=<path>
+  if (/^\/api(\/index)?$/.test(url.pathname) && url.searchParams.has('path')) {
+    url.pathname = '/api/' + url.searchParams.get('path');
+    url.searchParams.delete('path');
+  }
   try {
-    if (url.pathname.startsWith('/api/')) await api(req, res, url);
+    if (url.pathname.startsWith('/api/')) { await hydrate(); await api(req, res, url); }
     else serveStatic(req, res, url);
   } catch (e) {
     console.error(e);
-    if (!res.headersSent) send(res, 400, { errors: [e.message] });
+    if (!res.headersSent) await send(res, 400, { errors: [e.message] });
   }
-}).on('error', (e) => {
+}
+module.exports = handler;
+
+if (!SERVERLESS) http.createServer(handler).on('error', (e) => {
   if (e.code === 'EADDRINUSE') console.error(`Port ${PORT} is already in use. Start on another port, e.g.  PORT=5000 npm start`);
   else console.error(e);
   process.exit(1);

@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env server.js",
     "dev": "node --env-file-if-exists=.env server.js --dev",
-    "import": "node --env-file-if-exists=.env import.js"
+    "import": "node --env-file-if-exists=.env import.js",
+    "seed": "node scripts/make-seed.js"
   },
   "engines": {
     "node": ">=22.9"
