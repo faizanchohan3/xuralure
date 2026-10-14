@@ -1,0 +1,9 @@
+{
+  "name": "XoraLure",
+  "short_name": "XoraLure",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "icons": [{ "src": "/img/logo.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

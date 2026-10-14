@@ -1,0 +1,16 @@
+{
+  "name": "xoralure",
+  "version": "1.1.0",
+  "description": "XoraLure auto parts store with live inventory, BigCommerce import/sync, smart search autocorrect and auto-updating front end.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --env-file-if-exists=.env server.js --dev",
+    "import": "node --env-file-if-exists=.env import.js"
+  },
+  "engines": {
+    "node": ">=22.9"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}
