@@ -260,6 +260,15 @@ async function api(req, res, url) {
     if (q.get('model')) list = list.filter((p) => p.model === q.get('model'));
     if (q.get('year')) { const y = +q.get('year'); list = list.filter((p) => y >= p.yearFrom && y <= p.yearTo); }
     if (q.get('category')) list = list.filter((p) => p.category === q.get('category'));
+    // On Vercel, let the CDN cache the full catalog for a minute so visitors
+    // get it from the edge instead of waiting on the function (stock/price
+    // changes still show within ~60 s, which is how often browsers poll)
+    if (SERVERLESS && ![...q.keys()].length) {
+      return zlib.gzip(JSON.stringify(list), (err, buf) => send(res, 200, err ? list : buf, {
+        'Content-Type': 'application/json', ...(err ? {} : { 'Content-Encoding': 'gzip' }), Vary: 'Accept-Encoding',
+        'Cache-Control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=600'
+      }));
+    }
     // Large catalogs (tens of thousands of parts) compress ~10x with gzip
     if (/\bgzip\b/.test(req.headers['accept-encoding'] || '')) {
       return zlib.gzip(JSON.stringify(list), (err, buf) => err ? send(res, 200, list)
