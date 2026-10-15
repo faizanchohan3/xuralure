@@ -18,6 +18,13 @@ fs.mkdirSync(fn, { recursive: true });
 // Static storefront
 fs.cpSync(path.join(root, 'public'), path.join(out, 'static'), { recursive: true });
 
+// The full catalog as a static file: served from Vercel's CDN (compressed and
+// cached at the edge) instead of the function, so pages load fast. Orders
+// still re-check price and stock on the server.
+const seedFile = path.join(root, 'seed', 'products.json');
+const catalog = fs.existsSync(seedFile) ? require(seedFile) : require(path.join(root, 'catalog.js')).buildProducts();
+fs.writeFileSync(path.join(out, 'static', 'catalog.json'), JSON.stringify(catalog));
+
 // Serverless function: the server and everything it requires
 for (const item of ['server.js', 'catalog.js', 'lib', 'seed', 'package.json']) {
   const src = path.join(root, item);
@@ -37,6 +44,7 @@ fs.writeFileSync(path.join(out, 'config.json'), JSON.stringify({
   version: 3,
   routes: [
     { src: '^/(sw\\.js|index\\.html)?$', headers: { 'Cache-Control': 'no-cache' }, continue: true },
+    { src: '^/api/products$', dest: '/catalog.json' },
     { src: '^/api/(.*)$', dest: '/api?path=$1' },
     { handle: 'filesystem' }
   ]
