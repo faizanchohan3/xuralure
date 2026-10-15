@@ -1,0 +1,137 @@
+[
+  {
+    "id": "air-and-fuel-delivery-parts",
+    "name": "Air and Fuel Delivery Parts",
+    "icon": "engine"
+  },
+  {
+    "id": "brakes-parts",
+    "name": "Brakes Parts",
+    "icon": "wheel"
+  },
+  {
+    "id": "camping",
+    "name": "Camping",
+    "icon": "car"
+  },
+  {
+    "id": "drivetrain-parts",
+    "name": "Drivetrain Parts",
+    "icon": "axle"
+  },
+  {
+    "id": "engines-and-components",
+    "name": "Engines and Components",
+    "icon": "engine"
+  },
+  {
+    "id": "exhaust-systems",
+    "name": "Exhaust Systems",
+    "icon": "axle"
+  },
+  {
+    "id": "exterior-components",
+    "name": "Exterior Components",
+    "icon": "car"
+  },
+  {
+    "id": "fasteners-and-hardware",
+    "name": "Fasteners & Hardware",
+    "icon": "car"
+  },
+  {
+    "id": "fittings-hoses-and-valves",
+    "name": "Fittings Hoses and Valves",
+    "icon": "grid"
+  },
+  {
+    "id": "gaskets-and-seals",
+    "name": "Gaskets and Seals",
+    "icon": "car"
+  },
+  {
+    "id": "gauges-and-accessories",
+    "name": "Gauges and Accessories",
+    "icon": "chip"
+  },
+  {
+    "id": "heating-and-cooling",
+    "name": "Heating and Cooling",
+    "icon": "snow"
+  },
+  {
+    "id": "hunting-and-fishing",
+    "name": "Hunting & Fishing",
+    "icon": "car"
+  },
+  {
+    "id": "ignitions-and-electrical",
+    "name": "Ignitions and Electrical",
+    "icon": "bolt"
+  },
+  {
+    "id": "interior-accessories",
+    "name": "Interior Accessories",
+    "icon": "car"
+  },
+  {
+    "id": "lighting-and-electrical",
+    "name": "Lighting & Electrical",
+    "icon": "light"
+  },
+  {
+    "id": "marine-hardware",
+    "name": "Marine Hardware",
+    "icon": "car"
+  },
+  {
+    "id": "marine-navigation-and-instruments",
+    "name": "Marine Navigation & Instruments",
+    "icon": "car"
+  },
+  {
+    "id": "marine-plumbing-and-ventilation",
+    "name": "Marine Plumbing & Ventilation",
+    "icon": "car"
+  },
+  {
+    "id": "oils",
+    "name": "Oils",
+    "icon": "car"
+  },
+  {
+    "id": "other",
+    "name": "Other",
+    "icon": "car"
+  },
+  {
+    "id": "safety-equipment",
+    "name": "Safety Equipment",
+    "icon": "car"
+  },
+  {
+    "id": "steering-and-components",
+    "name": "Steering and Components",
+    "icon": "wheel"
+  },
+  {
+    "id": "suspension-and-components",
+    "name": "Suspension and Components",
+    "icon": "axle"
+  },
+  {
+    "id": "tools-and-shop-equipment",
+    "name": "Tools & Shop Equipment",
+    "icon": "car"
+  },
+  {
+    "id": "transmission-and-gearbox",
+    "name": "Transmission & Gearbox",
+    "icon": "gear"
+  },
+  {
+    "id": "wheels-and-tires",
+    "name": "Wheels & Tires",
+    "icon": "wheel"
+  }
+]
