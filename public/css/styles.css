@@ -363,3 +363,10 @@ details p { color: var(--muted); margin: 10px 0 0; }
   .home-cats .cat { padding: 14px 6px; }
   .home-cats .cat div { font-size: 13px; }
 }
+
+/* Review reward coupon */
+.coupon-row { display: flex; gap: 8px; }
+.coupon-row input { flex: 1; }
+.coupon-card { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 18px auto; padding: 18px 22px; max-width: 340px; border: 2px dashed var(--orange); border-radius: 14px; background: #fff7ed; }
+.coupon-card b { font-size: 24px; letter-spacing: .08em; color: var(--orange-d); }
+.reward-note { font-size: 13px; margin-top: 14px; }

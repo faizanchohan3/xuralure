@@ -304,6 +304,12 @@
     <div>${ticon('headset')}<span><b>Questions?</b> Call <a href="tel:+18005550199">(800) 555-0199</a></span></div>
   </div>`;
 
+  // ---------- review reward coupon ----------
+  const coupon = () => store.get('xa_coupon', null);
+  const discountOf = (subtotal) => { const c = coupon(); return c ? +(subtotal * c.percent / 100).toFixed(2) : 0; };
+  const payable = () => cart.total() - discountOf(cart.total());
+  const REWARD_NOTE = 'Reviewers get a 10% off code for their next order for any honest review — positive or negative. It never depends on the rating.';
+
   // ---------- verified customer reviews ----------
   // Every review comes from a real order (order number + email checked by the server).
   const stars = (n) => `<span class="stars" aria-label="${n} out of 5 stars">${[1, 2, 3, 4, 5].map((i) => `<span class="${i <= Math.round(n) ? 'on' : ''}">${ticon('star')}</span>`).join('')}</span>`;
@@ -324,7 +330,8 @@
       if (!document.body.contains(box)) return; // page changed while loading
       const summary = $('[data-review-summary]', box.parentElement) || null;
       if (summary) summary.innerHTML = data.count ? `${stars(data.average)} <b>${data.average}</b> <span class="muted">out of 5 · ${data.count} verified review${data.count === 1 ? '' : 's'}</span>` : '';
-      box.innerHTML = data.count ? `<div class="reviews">${data.reviews.map((r) => reviewCard(r, !productId)).join('')}</div>` : `
+      box.innerHTML = data.count ? `<div class="reviews">${data.reviews.map((r) => reviewCard(r, !productId)).join('')}</div>
+        <p class="muted reward-note">${REWARD_NOTE}</p>` : `
         <div class="empty reviews-empty">
           <h3>${productId ? 'No reviews for this part yet' : 'Reviews from verified customers'}</h3>
           <p class="muted">Every review on XoraLure comes from a real order — no paid or invented reviews. ${productId ? 'Bought this part?' : 'Ordered from us?'} Share your experience.</p>
@@ -714,21 +721,32 @@
             <div class="field"><label for="c-state">State</label><input id="c-state" name="state" data-autofix="state" autocomplete="address-level1" value="${esc(c.state)}" placeholder="TX" required></div>
             <div class="field"><label for="c-zip">ZIP</label><input id="c-zip" name="zip" data-autofix="zip" autocomplete="postal-code" inputmode="numeric" value="${esc(c.zip)}" required></div>
           </div>
-          <h3 style="margin-top:8px">Payment</h3>
+          <h3 style="margin-top:8px">Discount code</h3>
+          <div class="coupon-row"><input id="couponInput" placeholder="e.g. THANKS-1A2B3C" value="${esc(coupon()?.code || '')}" style="text-transform:uppercase" aria-label="Discount code"><button type="button" class="btn btn-ghost" id="couponBtn">${coupon() ? 'Remove' : 'Apply'}</button></div>
+          <small class="muted" id="couponMsg">${coupon() ? `${coupon().percent}% off applied` : 'Left a review? Use your thank-you code here.'}</small>
+          <h3 style="margin-top:16px">Payment</h3>
           <p class="notice" style="margin-top:0">Demo store: no card is charged. Connect Stripe or another payment provider in <code>server.js</code> before going live.</p>
-          <button class="btn btn-primary btn-block" id="placeOrder">Place order · ${money(cart.total())}</button>
+          <button class="btn btn-primary btn-block" id="placeOrder">Place order · ${money(payable())}</button>
         </form>
         <aside class="panel">
           <h3>Order summary</h3>
           ${lines.map((l) => `<div class="sum" data-pid="${l.p.id}"><span>${l.qty} × ${esc(l.p.title)}</span><b data-live="price">${money(l.p.price)}</b></div>`).join('')}
+          <div class="sum" id="discountRow" ${coupon() ? '' : 'hidden'}><span>Discount (${coupon()?.percent || 0}%)</span><span style="color:var(--green)">−${money(discountOf(cart.total()))}</span></div>
           <div class="sum"><span>Shipping</span><span style="color:var(--green)">FREE</span></div>
-          <div class="sum total"><span>Total</span><span id="grandTotal">${money(cart.total())}</span></div>
+          <div class="sum total"><span>Total</span><span id="grandTotal">${money(payable())}</span></div>
         </aside>
       </div></div>`;
   };
   pages.checkout.after = () => {
     const form = $('#checkoutForm'); if (!form) return;
     AutoCorrect.attach(form);
+    $('#couponBtn').addEventListener('click', async () => {
+      if (coupon()) { store.set('xa_coupon', null); return render(); }
+      const code = $('#couponInput').value.trim().toUpperCase();
+      if (!code) return;
+      try { store.set('xa_coupon', await api('/api/coupon', { method: 'POST', body: { code } })); render(); }
+      catch (err) { $('#couponMsg').textContent = err.message; $('#couponMsg').style.color = 'var(--red)'; }
+    });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       $$('[data-autofix]', form).forEach((el) => el.dispatchEvent(new Event('blur')));
@@ -736,13 +754,14 @@
       store.set('xa_customer', data);
       const btn = $('#placeOrder'); btn.disabled = true; btn.textContent = 'Placing order…';
       try {
-        const res = await api('/api/order', { method: 'POST', body: { ...data, items: cart.items } });
+        const res = await api('/api/order', { method: 'POST', body: { ...data, items: cart.items, coupon: coupon()?.code || '' } });
+        store.set('xa_coupon', null);
         store.set('xa_last_order', { id: res.id, email: data.email });
         cart.clear();
         location.hash = `#/order/${res.id}`;
       } catch (err) {
         showErrors(form, err.data?.errors || [err.message]);
-        btn.disabled = false; btn.textContent = `Place order · ${money(cart.total())}`;
+        btn.disabled = false; btn.textContent = `Place order · ${money(payable())}`;
       }
     });
   };
@@ -753,6 +772,7 @@
     return `<div class="container page narrow">
       <h1>Write a review</h1>
       <p class="muted">Reviews on XoraLure come only from verified customers. Enter your order number and the email you ordered with.</p>
+      <div class="notice">🎁 <b>Thank you gift:</b> ${REWARD_NOTE}</div>
       <form class="panel" id="reviewForm" novalidate>
         <div class="row">
           <div class="field"><label for="r-order">Order number</label><input id="r-order" name="orderId" value="${esc(params.get('order') || last.id || '')}" placeholder="XA…" style="text-transform:uppercase" required></div>
@@ -798,7 +818,14 @@
         const r = await api('/api/reviews', { method: 'POST', body: data });
         app.innerHTML = `<div class="container page narrow"><div class="panel success"><div class="check">✓</div>
           <h1>Thank you for your review!</h1><p class="muted">It's now live on the product page.</p>
+          ${r.coupon ? `<div class="coupon-card"><small>Your 10% off code for your next order</small><b>${esc(r.coupon.code)}</b><button type="button" class="btn btn-ghost" id="copyCoupon">Copy code</button></div>` : ''}
           <a class="btn btn-primary" href="#/part/${encodeURIComponent(r.productId)}">See your review</a></div></div>`;
+        if (r.coupon) {
+          store.set('xa_coupon', r.coupon); // pre-filled at checkout next time
+          $('#copyCoupon').addEventListener('click', () => {
+            navigator.clipboard?.writeText(r.coupon.code).then(() => toast('Code copied'), () => {});
+          });
+        }
       } catch (err) {
         showErrors(form, err.data?.errors || [err.message]);
         btn.disabled = false; btn.textContent = 'Submit review';
@@ -1028,7 +1055,8 @@
     }
     const total = cart.total();
     ['#subtotal', '#grandTotal'].forEach((s) => { const el = $(s); if (el) el.textContent = money(total); });
-    const po = $('#placeOrder'); if (po && !po.disabled) po.textContent = `Place order · ${money(total)}`;
+    const po = $('#placeOrder'); if (po && !po.disabled) po.textContent = `Place order · ${money(payable())}`;
+    const gt = $('#discountRow') && $('#grandTotal'); if (gt) gt.textContent = money(payable());
   }
 
   function onNewVersion(v) {

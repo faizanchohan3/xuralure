@@ -23,7 +23,7 @@ fs.mkdirSync(DATA, { recursive: true });
 // ---------- persistence ----------
 // Local files always; on serverless, also the KV database (see lib/kv.js),
 // because /tmp is wiped between cold starts and not shared between instances.
-const KV_COLLECTIONS = ['orders.json', 'quotes.json', 'messages.json', 'subscribers.json', 'reviews.json', 'stock.json'];
+const KV_COLLECTIONS = ['orders.json', 'quotes.json', 'messages.json', 'subscribers.json', 'reviews.json', 'coupons.json', 'stock.json'];
 const pendingWrites = [];
 function load(name, fallback) {
   try { return JSON.parse(fs.readFileSync(path.join(DATA, name), 'utf8')); }
@@ -66,6 +66,7 @@ let messages = load('messages.json', []);
 let subscribers = load('subscribers.json', []);
 // Reviews come only from verified customers (order number + email must match)
 let reviews = load('reviews.json', []);
+let coupons = load('coupons.json', []);
 const publicReview = (r) => ({ id: r.id, productId: r.productId, productTitle: r.productTitle, rating: r.rating, title: r.title, text: r.text, name: r.name, createdAt: r.createdAt, verified: true });
 function reviewStats(list) {
   const count = list.length;
@@ -99,7 +100,7 @@ async function hydrate() {
   if (!kv.enabled || Date.now() - hydratedAt < 3000) return;
   const d = await kv.getMany(KV_COLLECTIONS);
   orders = d['orders.json'] || []; quotes = d['quotes.json'] || []; messages = d['messages.json'] || [];
-  subscribers = d['subscribers.json'] || []; reviews = d['reviews.json'] || [];
+  subscribers = d['subscribers.json'] || []; reviews = d['reviews.json'] || []; coupons = d['coupons.json'] || [];
   const stock = d['stock.json'] || {};
   for (const p of products) if (p.id in stock) p.stock = stock[p.id];
   hydratedAt = Date.now();
@@ -333,6 +334,14 @@ async function api(req, res, url) {
     }
     if (errors.length) return send(res, 409, { errors });
 
+    // Optional review-reward coupon (single use)
+    let coupon = null;
+    if (clean(b.coupon)) {
+      coupon = coupons.find((c) => c.code === clean(b.coupon, 30).toUpperCase());
+      if (!coupon) return send(res, 400, { errors: ['That discount code is not valid.'] });
+      if (coupon.usedBy) return send(res, 400, { errors: ['That discount code has already been used.'] });
+    }
+
     const changed = [];
     for (const l of lines) {
       const p = products.find((x) => x.id === l.id);
@@ -341,13 +350,15 @@ async function api(req, res, url) {
       changed.push({ id: p.id, stock: p.stock, price: p.price, updatedAt: p.updatedAt });
     }
     const subtotal = +lines.reduce((s, l) => s + l.price * l.qty, 0).toFixed(2);
+    const discount = coupon ? +(subtotal * coupon.percent / 100).toFixed(2) : 0;
     const order = {
       id: newId('XA'), createdAt: new Date().toISOString(), status: 'Processing',
       customer: { name: clean(b.name), email: clean(b.email), phone: clean(b.phone) },
       shipTo: { address: clean(b.address), city: clean(b.city), state: clean(b.state).toUpperCase(), zip: clean(b.zip) },
-      lines, subtotal, shipping: 0, total: subtotal
+      lines, subtotal, discount, coupon: coupon ? coupon.code : null, shipping: 0, total: +(subtotal - discount).toFixed(2)
     };
     orders.push(order);
+    if (coupon) { coupon.usedBy = order.id; coupon.usedAt = order.createdAt; save('coupons.json', coupons); }
     save('orders.json', orders); save('products.json', products);
     broadcast('inventory', changed);
     console.log(`[order] ${order.id} $${order.total} (${lines.length} item(s))`);
@@ -396,7 +407,20 @@ async function api(req, res, url) {
     reviews.push(review); save('reviews.json', reviews);
     broadcast('review', publicReview(review));
     console.log(`[review] ${review.id} ${rating}★ ${line.title}`);
-    return send(res, 201, publicReview(review));
+    // Thank-you reward: 10% off the next order, for any honest review (good or bad).
+    // Disclosed on the site; the code goes only to the reviewer.
+    const code = 'THANKS-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+    coupons.push({ code, percent: 10, reviewId: review.id, email: review.email, createdAt: review.createdAt, usedBy: null });
+    save('coupons.json', coupons);
+    return send(res, 201, { ...publicReview(review), coupon: { code, percent: 10 } });
+  }
+
+  if (route === 'POST /api/coupon') {
+    const b = await readBody(req);
+    const c = coupons.find((x) => x.code === clean(b.code, 30).toUpperCase());
+    if (!c) return send(res, 404, { errors: ['That discount code is not valid.'] });
+    if (c.usedBy) return send(res, 400, { errors: ['That discount code has already been used.'] });
+    return send(res, 200, { code: c.code, percent: c.percent });
   }
 
   if (route === 'POST /api/subscribe') {
