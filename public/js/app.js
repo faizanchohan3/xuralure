@@ -333,6 +333,49 @@
     } catch { box.innerHTML = ''; }
   }
 
+  // ---------- brands ----------
+  // Brand info derived from the catalog: product count + a product photo to represent the brand
+  function brandInfo() {
+    if (state._brandInfo && state._brandInfo.n === state.products.length) return state._brandInfo.map;
+    const map = new Map();
+    for (const p of state.products) {
+      if (!p.brand) continue;
+      const b = map.get(p.brand) || { name: p.brand, count: 0, image: null, icon: p.icon };
+      b.count++;
+      if (!b.image && p.image) b.image = p.image;
+      map.set(p.brand, b);
+    }
+    state._brandInfo = { n: state.products.length, map };
+    return map;
+  }
+  const topBrands = (n) => [...brandInfo().values()].sort((a, b) => b.count - a.count).slice(0, n);
+  const brandTile = (b) => `<a class="brand-tile" href="#/shop?brand=${encodeURIComponent(b.name)}">
+      <span class="brand-tile-img${b.image ? ' has-photo' : ''}">${b.image ? `<img src="${esc(b.image)}" alt="" loading="lazy" onerror="this.parentElement.classList.remove('has-photo');this.remove()">` : ''}<span class="mono">${esc(b.name.replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '•')}</span></span>
+      <b>${esc(b.name)}</b><small>${b.count.toLocaleString()} part${b.count === 1 ? '' : 's'}</small>
+    </a>`;
+
+  pages.brands = (params) => {
+    const all = [...brandInfo().values()].sort((a, b) => a.name.localeCompare(b.name));
+    const letters = [...new Set(all.map((b) => (/[A-Z]/i.test(b.name[0]) ? b.name[0].toUpperCase() : '#')))];
+    return `<div class="container page">
+      <div class="section-head"><div><span class="kicker">${all.length} brands</span><h1 style="margin:0">Shop by brand</h1></div>
+        <input id="brandFilter" type="search" placeholder="Find a brand…" aria-label="Find a brand" style="max-width:280px"></div>
+      <nav class="letters">${letters.map((l) => `<a href="#/brands" data-letter="${l}">${l}</a>`).join('')}</nav>
+      ${letters.map((l) => `<section class="letter-group" id="brands-${l}"><h2>${l}</h2><div class="brand-grid">
+        ${all.filter((b) => (/[A-Z]/i.test(b.name[0]) ? b.name[0].toUpperCase() : '#') === l).map(brandTile).join('')}</div></section>`).join('')}
+    </div>`;
+  };
+  pages.brands.after = () => {
+    $$('[data-letter]').forEach((a) => a.addEventListener('click', (e) => {
+      e.preventDefault(); const g = $('#brands-' + CSS.escape(a.dataset.letter)); if (g) g.scrollIntoView({ behavior: 'smooth' });
+    }));
+    $('#brandFilter').addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      $$('.brand-tile').forEach((t) => { t.hidden = q && !t.textContent.toLowerCase().includes(q); });
+      $$('.letter-group').forEach((g) => { g.hidden = !$$('.brand-tile', g).some((t) => !t.hidden); });
+    });
+  };
+
   pages.home = () => {
     const inStock = (p) => avail(p) > 0;
     const featured = [...state.products].filter((p) => inStock(p) && (!p.grade || p.grade === 'A'))
@@ -392,8 +435,8 @@
 
     ${state.brands.length ? `<section class="section">
       <div class="container">
-        <div class="section-head"><div><span class="kicker">Quality you can count on</span><h2>Shop by brand</h2></div></div>
-        <div class="brand-strip">${state.brands.map((b) => `<a href="#/shop?brand=${encodeURIComponent(b)}"><b>${esc(b)}</b><small>${brandCounts[b]} parts</small></a>`).join('')}</div>
+        <div class="section-head"><div><span class="kicker">Quality you can count on</span><h2>Shop by brand</h2></div>${state.brands.length > 24 ? `<a href="#/brands" class="link-more">All ${state.brands.length} brands →</a>` : ''}</div>
+        <div class="brand-grid">${topBrands(24).map(brandTile).join('')}</div>
       </div>
     </section>` : ''}
 
@@ -933,7 +976,7 @@
     page.after && page.after(params, arg);
     $$('.nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + name));
     $('#nav').classList.remove('open');
-    const t = { home: 'Quality Used & OEM Auto Parts', shop: 'Shop Parts', part: state.byId.get(arg)?.title, cart: 'Cart', checkout: 'Checkout', quote: 'Request a Quote', track: 'Track Order', about: 'About', contact: 'Contact', warranty: 'Warranty', shipping: 'Shipping Policy', privacy: 'Privacy Policy', terms: 'Terms of Service', review: 'Write a Review' }[name];
+    const t = { home: 'Quality Used & OEM Auto Parts', shop: 'Shop Parts', part: state.byId.get(arg)?.title, cart: 'Cart', checkout: 'Checkout', quote: 'Request a Quote', track: 'Track Order', about: 'About', contact: 'Contact', warranty: 'Warranty', shipping: 'Shipping Policy', privacy: 'Privacy Policy', terms: 'Terms of Service', review: 'Write a Review', brands: 'Shop by Brand' }[name];
     document.title = `${t || "XoraLure"} — XoraLure`;
   }
 

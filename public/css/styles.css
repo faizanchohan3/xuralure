@@ -325,3 +325,22 @@ details p { color: var(--muted); margin: 10px 0 0; }
 .pdp .card-img .ph-brand { font-size: 16px; }
 .line .thumb .ph-brand { display: none; }
 .line .thumb .ph svg { width: 32px; height: 32px; }
+
+/* Shop by brand: tiles with a product photo from the brand */
+.brand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.brand-tile { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; text-align: center; display: flex; flex-direction: column; gap: 4px; transition: border-color .15s, box-shadow .15s, transform .15s; }
+.brand-tile:hover { border-color: #fed7aa; box-shadow: var(--shadow); transform: translateY(-2px); }
+.brand-tile[hidden] { display: none; }
+.brand-tile-img { aspect-ratio: 1; border-radius: 10px; background: linear-gradient(135deg, #f1f5f9, #e2e8f0); display: grid; place-items: center; overflow: hidden; margin-bottom: 6px; position: relative; }
+.brand-tile-img.has-photo { background: #fff; }
+.brand-tile-img img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+.brand-tile-img .mono { font-size: 30px; font-weight: 800; color: #64748b; letter-spacing: .04em; }
+.brand-tile-img.has-photo .mono { display: none; }
+.brand-tile b { font-size: 14px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.brand-tile small { color: var(--muted); font-size: 12px; }
+.letters { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 20px; position: sticky; top: 72px; background: var(--bg); padding: 8px 0; z-index: 5; }
+.letters a { min-width: 34px; text-align: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 700; font-size: 14px; }
+.letters a:hover { border-color: var(--orange); color: var(--orange-d); }
+.letter-group { margin-bottom: 28px; scroll-margin-top: 130px; }
+.letter-group[hidden] { display: none; }
+.letter-group h2 { font-size: 22px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }

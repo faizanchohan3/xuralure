@@ -1,7 +1,8 @@
-// Import the product list from the public "Shop All" pages of your BigCommerce
-// storefront. Only catalog facts are taken: product name, brand, price and
-// category. Photos and descriptions are NOT copied — bring those in from your
-// own BigCommerce export (`npm run import -- export.csv`) when you have it.
+// Import the product list from the category pages of your own BigCommerce
+// storefront: product name, brand, price, category, and a link to each
+// product photo on the store's BigCommerce CDN (images are linked, not
+// copied). Descriptions and stock levels come from your BigCommerce export
+// (`npm run import -- export.csv`).
 //
 //   node scripts/import-from-store.js https://agileautoparts.com
 //
@@ -50,7 +51,10 @@ function parseCards(html) {
     const price = parseFloat(attr('data-product-price').replace(/[^0-9.]/g, ''));
     if (!title || !(price > 0)) continue;
     const cats = attr('data-product-category').split(',').map((s) => s.trim()).filter((c) => c && !/^shop all$/i.test(c));
-    out.push({ storeId: m[1], title, brand: attr('data-product-brand'), price, category: cats[0] || 'Other' });
+    // Photo: link to the image on the store's own BigCommerce CDN (not downloaded or re-hosted)
+    const card = html.slice(m.index, m.index + 4000);
+    const img = card.match(/<img[^>]*\bsrc="(https:\/\/cdn\d*\.bigcommerce\.com\/[^"]+)"/);
+    out.push({ storeId: m[1], title, brand: attr('data-product-brand'), price, category: cats[0] || 'Other', image: img ? decode(img[1]) : null });
   }
   return out;
 }
@@ -93,7 +97,7 @@ async function main() {
   const products = Object.values(state.items).map((c) => finish({
     id: 'AG' + c.storeId, sku: '', title: c.title, brand: c.brand,
     category: slug(c.category), categoryName: c.category, subcategory: '',
-    price: c.price, listPrice: null, stock: null, image: null, description: '', spec: {}
+    price: c.price, listPrice: null, stock: null, image: c.image || null, description: '', spec: {}
   }));
   const categories = categoriesFrom(products);
   const file = path.join(DATA, 'import.json');
