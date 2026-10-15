@@ -333,6 +333,22 @@
     } catch { box.innerHTML = ''; }
   }
 
+  // ---------- categories ----------
+  // Categories with products, biggest first; the home page shows the first two rows only
+  function sortedCategories() {
+    const counts = state.products.reduce((m, p) => (m[p.category] = (m[p.category] || 0) + 1, m), {});
+    return state.categories.filter((c) => counts[c.id]).map((c) => ({ ...c, count: counts[c.id] })).sort((a, b) => b.count - a.count);
+  }
+  const categoryTile = (c) => `<a class="cat" href="#/shop?category=${encodeURIComponent(c.id)}">${icon(c.icon)}<div>${esc(c.name)}</div><small>${c.count.toLocaleString()} products</small></a>`;
+
+  pages.categories = () => {
+    const all = sortedCategories().sort((a, b) => a.name.localeCompare(b.name));
+    return `<div class="container page">
+      <div class="section-head"><div><span class="kicker">${all.length} categories</span><h1 style="margin:0">All categories</h1></div><a href="#/shop" class="link-more">Browse all parts →</a></div>
+      <div class="cat-grid">${all.map(categoryTile).join('')}</div>
+    </div>`;
+  };
+
   // ---------- brands ----------
   // Brand info derived from the catalog: product count + a product photo to represent the brand
   function brandInfo() {
@@ -412,9 +428,9 @@
 
     <section class="section">
       <div class="container">
-        <div class="section-head"><div><span class="kicker">Browse</span><h2>Shop by category</h2></div><a href="#/shop" class="link-more">View all parts →</a></div>
-        <div class="cat-grid">
-          ${state.categories.filter((c) => counts[c.id]).map((c) => `<a class="cat" href="#/shop?category=${encodeURIComponent(c.id)}">${icon(c.icon)}<div>${esc(c.name)}</div><small>${counts[c.id]} products</small></a>`).join('')}
+        <div class="section-head"><div><span class="kicker">Browse</span><h2>Shop by category</h2></div><a href="#/categories" class="link-more">View all ${state.categories.filter((c) => counts[c.id]).length} categories →</a></div>
+        <div class="cat-grid home-cats">
+          ${sortedCategories().map(categoryTile).join('')}
         </div>
       </div>
     </section>
@@ -976,7 +992,7 @@
     page.after && page.after(params, arg);
     $$('.nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#/' + name));
     $('#nav').classList.remove('open');
-    const t = { home: 'Quality Used & OEM Auto Parts', shop: 'Shop Parts', part: state.byId.get(arg)?.title, cart: 'Cart', checkout: 'Checkout', quote: 'Request a Quote', track: 'Track Order', about: 'About', contact: 'Contact', warranty: 'Warranty', shipping: 'Shipping Policy', privacy: 'Privacy Policy', terms: 'Terms of Service', review: 'Write a Review', brands: 'Shop by Brand' }[name];
+    const t = { home: 'Quality Used & OEM Auto Parts', shop: 'Shop Parts', part: state.byId.get(arg)?.title, cart: 'Cart', checkout: 'Checkout', quote: 'Request a Quote', track: 'Track Order', about: 'About', contact: 'Contact', warranty: 'Warranty', shipping: 'Shipping Policy', privacy: 'Privacy Policy', terms: 'Terms of Service', review: 'Write a Review', brands: 'Shop by Brand', categories: 'All Categories' }[name];
     document.title = `${t || "XoraLure"} — XoraLure`;
   }
 

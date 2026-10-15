@@ -349,3 +349,17 @@ details p { color: var(--muted); margin: 10px 0 0; }
 .card-img { overflow: hidden; }
 .card-img.has-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 12px; }
 .card-img .tag { z-index: 1; }
+
+/* Home page: categories limited to exactly two rows at every screen width */
+.cat-grid.home-cats { grid-template-columns: repeat(7, 1fr); }
+.home-cats .cat:nth-child(n+15) { display: none; }
+@media (max-width: 960px) {
+  .cat-grid.home-cats { grid-template-columns: repeat(4, 1fr); }
+  .home-cats .cat:nth-child(n+9) { display: none; }
+}
+@media (max-width: 560px) {
+  .cat-grid.home-cats { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .home-cats .cat:nth-child(n+7) { display: none; }
+  .home-cats .cat { padding: 14px 6px; }
+  .home-cats .cat div { font-size: 13px; }
+}
