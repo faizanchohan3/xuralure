@@ -316,3 +316,12 @@ details p { color: var(--muted); margin: 10px 0 0; }
 /* highlight the chosen star and every star before it (row-reverse order) */
 .star-input label:hover span, .star-input label:hover ~ label span,
 .star-input label:has(input:checked) span, .star-input label:has(input:checked) ~ label span { color: #f59e0b; }
+
+/* Placeholder for products without a photo */
+.card-img .ph { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 100%; }
+.card-img .ph svg { width: 34%; height: auto; max-height: 50%; color: #94a3b8; }
+.card-img .ph-brand { font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #475569; background: #fff; border: 1px solid var(--line); padding: 3px 10px; border-radius: 999px; max-width: 85%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-img.has-photo .ph { display: none; }
+.pdp .card-img .ph-brand { font-size: 16px; }
+.line .thumb .ph-brand { display: none; }
+.line .thumb .ph svg { width: 32px; height: 32px; }

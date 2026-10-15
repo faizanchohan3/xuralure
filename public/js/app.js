@@ -100,7 +100,9 @@
   const listPrice = (p) => (p.listPrice > p.price ? `<s>${money(p.listPrice)}</s>` : '');
   // Real product photo when the store has one, category icon otherwise
   // (if the photo fails to load, the parent drops .has-photo and the icon shows)
-  const picture = (p) => (p.image ? `<img src="${esc(p.image)}" alt="${esc(p.title)}" loading="lazy" onerror="this.parentElement.classList.remove('has-photo');this.remove()">` : '') + icon(p.icon);
+  // No photo yet: a branded placeholder (category icon + brand) instead of an empty box
+  const picture = (p) => (p.image ? `<img src="${esc(p.image)}" alt="${esc(p.title)}" loading="lazy" onerror="this.parentElement.classList.remove('has-photo');this.remove()">` : '')
+    + `<span class="ph">${icon(p.icon)}${p.brand ? `<b class="ph-brand">${esc(p.brand)}</b>` : ''}</span>`;
   function cardMeta(p) {
     const bits = [];
     if (p.brand) bits.push(esc(p.brand));
